@@ -5,7 +5,17 @@ date: "September 8, 2016"
 output: html_document
 ---
 
-```{r setup, warning=F, messages=F, fig.width=9, fig.height=50}
+This is the exploratory visualizaton behind the Trend CT story: [In Connecticut, nearly one in ten have asthma](http://trendct.org/2016/09/13/asthma-in-connecticut/).
+
+Visit the [repo](https://github.com/trendct-data/asthma-ct/) for the [data](https://github.com/trendct-data/asthma/tree/master/data) used in this analysis. (Also, check out the reproducible scripts and data behind many of our other stories in our [central data stories repo](https://github.com/trendct-data))
+
+The data used in this analysis was either imported from the state of Connecticut's [open data portal](https://data.ct.gov/Health-and-Human-Services/Combined-Asthma-Emergency-Department-and-Hospitali/javn-ujwr) or downloaded from the Environmental Protection Agency National Air Toxics Assessment site.
+
+What’s in this walkthrough
+
+Several visualizations of asthma-related hospitalizations or emergency treatment as well as air pollutants by census tract.
+
+```{r setup, warning=F, message=F, fig.width=9, fig.height=50}
 library(tidyr)
 library(dplyr)
 library(ggmap)
@@ -16,6 +26,8 @@ library(rgdal)
 library(sp)
 library(maptools)
 library(scales)
+library(readxl)
+
 asthma <- read.csv("https://data.ct.gov/api/views/javn-ujwr/rows.csv?accessType=DOWNLOAD", stringsAsFactors=F)
 
 
@@ -73,7 +85,45 @@ tm_ct <- ggplot() +
   facet_wrap(~category, ncol=1) +
   scale_fill_distiller(type="seq", trans="reverse", palette = "Reds", breaks=pretty_breaks(n=10)) +
   theme_nothing(legend=TRUE) +
-  labs(title="Asthma in Connecticut", fill="")
+  labs(title="Asthma-related emergencies Connecticut 2010-2015", fill="")
+print(tm_ct)
+
+```
+
+
+# Mapping emissions
+
+```{r emissions, warning=F, message=F, fig.width=9, fig.height=16}
+
+pol <- read_excel("data/2011nata_national_resp_by_tract_poll.xlsx", sheet=1)
+pol2 <- read_excel("data/2011nata_national_resp_by_tract_source.xlsx", sheet=1)
+
+
+ct_pol <- subset(pol, State=="CT")
+
+ct_pol <- ct_pol %>%
+  select(Tract, `Point (includes railyards) Respiratory HI`, `Total Respiratory HI`) %>%
+  filter(Tract!="00000000000")
+
+colnames(ct_pol) <- c("id", "point", "total.respiratory")
+
+total_map <- left_join(towntracts, ct_pol, by="id")
+total_map$ugh <- NULL
+total_map$town <- NULL
+total_map$Census.Tract.y <- NULL
+
+total_map2 <- gather(total_map, "category", "n", 8:9)
+
+total_map2$n <- as.numeric(total_map2$n)
+
+tm_ct <- ggplot() +
+  geom_polygon(data = total_map2, aes(x=long, y=lat, group=group, fill=n), color = "black", size=0.2) +
+  geom_polygon(data = townborders, aes(x=long, y=lat, group=group, fill=total), color = "black", fill=NA, size=0.5) +
+  coord_map() +
+  facet_wrap(~category, ncol=1) +
+  scale_fill_distiller(type="seq", trans="reverse", palette = "Reds", breaks=pretty_breaks(n=10)) +
+  theme_nothing(legend=TRUE) +
+  labs(title="Emissions in Connecticut", fill="")
 print(tm_ct)
 
 ```
